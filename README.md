@@ -12,6 +12,6 @@ After server started listening:
 nc -u 127.0.0.1 10000
 acquire 1
 acquire 2
-release 1
 release 2
+release 1
 ```
