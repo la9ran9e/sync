@@ -37,7 +37,7 @@ class AIOSocket:
         try:
             n = self._sock.sendto(data, addr)
         except (BlockingIOError, InterruptedError):
-            loop.add_writer(fd, self.sendto, data, addr, fut, True)
+            self._loop.add_writer(fd, self.sendto, data, addr, fut, True)
         else:
             fut.set_result(n)
         return fut
