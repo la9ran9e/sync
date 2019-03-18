@@ -60,3 +60,22 @@ class ServerSocket:
 
     async def notify(self, address):
         await self._sock.sendto(self._OK, address)
+
+
+class ClientSocket:
+    def __init__(self, address, family, type):
+        self._address = address
+        self._loop = asyncio.get_event_loop()
+        self._sock = AIOSocket(family, type)
+
+    async def send(self, msg):
+        body = bytes(msg, encoding='UTF-8')
+        await self._sock.sendto(body, self._address)
+
+    async def wait_for_notice(self):
+        while True:
+            _, addr = await self._sock.recvfrom(1)
+            if addr == self._address:
+                break
+            else:
+                print(f'message from unexpected address: {addr}')

@@ -11,3 +11,9 @@ class Processor:
 			raise ProcessError(f'Wrong command {command}')
 
 		return command, id
+
+
+class ClientProcessor:
+	def process(self, command, _id):
+		msg = f'{command} {_id}'
+		return msg
