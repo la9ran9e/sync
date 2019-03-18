@@ -1,6 +1,5 @@
 import socket
 import asyncio
-import collections
 
 from sync import transport, processor, client
 import settings
