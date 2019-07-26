@@ -1,43 +1,56 @@
+import socket
 import asyncio
-from sync import processor
+
+from .processor import Processor, ProcessError
+from .transport import ServerSocket
+from .locker import Lock
+
+
+def _sock_factory(address):
+    return ServerSocket(address,
+                        family=socket.AF_INET,
+                        type=socket.SOCK_DGRAM)
 
 
 class Server:
-	def __init__(self, sock, processor, locker, workers=100):
-		self._sock = sock
-		self._processor = processor
-		self._locker = locker
-		self._loop = asyncio.get_event_loop()
-		self._queue = asyncio.Queue(maxsize=workers)
-		self._workers_num = workers
+    def __init__(self, bind_address,
+                 sock_factory=_sock_factory,
+                 processor_factory=Processor,
+                 locker_factory=Lock,
+                 loop=None):
+        self._sock = sock_factory(bind_address)
+        self._processor = processor_factory()
+        self._locker = locker_factory()
+        self._loop = loop if loop else asyncio.get_event_loop()
 
-	def run(self):
-		self._loop.run_until_complete(self._do_run())
+    def run(self):
+        self._loop.run_until_complete(self._do_run())
 
-	async def _do_run(self):
-		self._worker_tasks = [self._loop.create_task(self._worker(_id)) for _id in range(self._workers_num)]
-		self._listen_task = self._loop.create_task(self._listen())
-		await asyncio.wait([*self._worker_tasks, self._listen_task])
+    async def _do_run(self):
+        await self._listen()
 
-	async def _listen(self):
-		while True:
-			msg, address = await self._sock.getone()
-			try:
-				command, _id = self._processor.process(msg)
-			except processor.ProcessError as err:
-				print(err)
-				continue
+    async def _listen(self):
+        while True:
+            msg, address = await self._sock.getone()
+            try:
+                command, _id = self._processor.process(msg)
+            except ProcessError as err:
+                print(err)
+                await self._sock.notice_error(address, err)
+                continue
 
-			await self._queue.put((command, _id, address))
+            try:
+                self._loop.create_task(self._handle_command(command, _id, address))
+            except Exception as err:
+                await self._sock.notice_error(address, err)
 
-	async def _worker(self, _id):
-		while True:
-			command, _id, address = await self._queue.get()
-			if command == 'acquire':
-				await self._locker.acquire(_id)
-				await self._sock.notify(address)
-			else:
-				self._locker.release(_id)
-				await self._sock.notify(address)
-
-			self._queue.task_done()
+    async def _handle_command(self, command, _id, address):
+        if command == 'acquire':
+            await self._locker.acquire(_id)
+            await self._sock.notify(address)
+        elif command == 'release':
+            self._locker.release(_id)
+            await self._sock.notify(address)
+        elif command == 'acquire_no_wait':
+            ok = await self._locker.acquire_no_wait(_id)
+            await self._sock.notify(address, ok=ok)

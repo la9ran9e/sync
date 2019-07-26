@@ -43,12 +43,14 @@ class AIOSocket:
         return fut
 
     def __getattr__(self, attr):
-    	return getattr(self._sock, attr)
+        return getattr(self._sock, attr)
+
+
+OK = bytes('1', encoding='UTF-8')
+BAD = bytes('0', encoding='UTF-8')
 
 
 class ServerSocket:
-    _OK = bytes('1', encoding='UTF-8')
-
     def __init__(self, address, family, type):
         self._loop = asyncio.get_event_loop()
         self._sock = AIOSocket(family, type)
@@ -58,8 +60,12 @@ class ServerSocket:
         msg, address = await self._sock.recvfrom(32)
         return msg.decode('UTF-8').rstrip(), address
 
-    async def notify(self, address):
-        await self._sock.sendto(self._OK, address)
+    async def notify(self, address, ok=True):
+        await self._sock.sendto(OK if ok else BAD, address)
+
+    async def notice_error(self, address, err):
+        berr = bytes(err, encoding='UTF-8')
+        await self._sock.sendto(berr, address)
 
 
 class ClientSocket:
@@ -74,8 +80,8 @@ class ClientSocket:
 
     async def wait_for_notice(self):
         while True:
-            _, addr = await self._sock.recvfrom(1)
+            resp, addr = await self._sock.recvfrom(1)
             if addr == self._address:
-                break
+                return resp
             else:
                 print(f'message from unexpected address: {addr}')
