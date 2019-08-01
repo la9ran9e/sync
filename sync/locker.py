@@ -4,8 +4,8 @@ from functools import partial
 
 
 class ItemBase:
-    def __init__(self, locker_factory=asyncio.Lock):
-        self._locker = locker_factory()
+    def __init__(self):
+        self._locked = False
         self._oplock = asyncio.Lock()
 
     @classmethod
@@ -20,22 +20,22 @@ class ItemBase:
 class Item(ItemBase):
     @property
     def locked(self):
-        return self._locker.locked()
+        return self._locked
 
     @ItemBase._with_locker
     async def acquire(self):
-        await self._locker.acquire()
+        self._locked = True
 
     def release(self):
         assert self.locked
-        self._locker.release()
+        self._locked = False
 
     @ItemBase._with_locker
     async def acquire_no_wait(self):
         if self.locked:
             return False
 
-        await self._locker.acquire()
+        self._locked = True
 
         return True
 

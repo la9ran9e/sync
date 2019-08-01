@@ -36,13 +36,13 @@ class Server:
                 command, _id = self._processor.process(msg)
             except ProcessError as err:
                 print(err)
-                await self._sock.notice_error(address, err)
+                await self._sock.notice_error(address)
                 continue
 
             try:
                 self._loop.create_task(self._handle_command(command, _id, address))
             except Exception as err:
-                await self._sock.notice_error(address, err)
+                await self._sock.notice_error(address)
 
     async def _handle_command(self, command, _id, address):
         if command == 'acquire':

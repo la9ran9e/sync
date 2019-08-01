@@ -48,6 +48,7 @@ class AIOSocket:
 
 OK = bytes('1', encoding='UTF-8')
 BAD = bytes('0', encoding='UTF-8')
+ERROR = bytes('e', encoding='UTF-8')
 
 
 class ServerSocket:
@@ -57,30 +58,28 @@ class ServerSocket:
         self._sock.bind(address)
 
     async def getone(self):
-        msg, address = await self._sock.recvfrom(32)
+        msg, address = await self._sock.recvfrom(1024)
         return msg.decode('UTF-8').rstrip(), address
 
     async def notify(self, address, ok=True):
         await self._sock.sendto(OK if ok else BAD, address)
 
-    async def notice_error(self, address, err):
-        berr = bytes(err, encoding='UTF-8')
-        await self._sock.sendto(berr, address)
+    async def notice_error(self, address):
+        await self._sock.sendto(ERROR, address)
 
 
 class ClientSocket:
     def __init__(self, address, family, type):
         self._address = address
-        self._loop = asyncio.get_event_loop()
-        self._sock = AIOSocket(family, type)
+        self._sock = socket.socket(family, type)
 
-    async def send(self, msg):
+    def send(self, msg):
         body = bytes(msg, encoding='UTF-8')
-        await self._sock.sendto(body, self._address)
+        self._sock.sendto(body, self._address)
 
-    async def wait_for_notice(self):
+    def wait_for_notice(self):
         while True:
-            resp, addr = await self._sock.recvfrom(1)
+            resp, addr = self._sock.recvfrom(1)
             if addr == self._address:
                 return resp
             else:

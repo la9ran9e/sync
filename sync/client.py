@@ -19,29 +19,36 @@ class Client:
         self._processor = processor_factory()
         self._items_registry = set()
 
-    async def _perform_command(self, command, _id):
+    def _perform_command(self, command, _id):
         msg = self._processor.process(command, _id)
-        await self._sock.send(msg)
-        return await self._sock.wait_for_notice()
+        self._sock.send(msg)
+        return self._sock.wait_for_notice()
 
-    async def acquire(self, _id):
-        await self._perform_command('acquire', _id)
+    def acquire(self, _id):
+        self._perform_command('acquire', _id)
         self._items_registry.add(_id)
 
-    async def release(self, _id):
-        await self._perform_command('release', _id)
+    def release(self, _id):
+        self._perform_command('release', _id)
         self._items_registry.remove(_id)
 
-    async def acquire_no_wait(self, _id):
-        res = await self._perform_command('release', _id)
+    def acquire_no_wait(self, _id):
+        res = self._perform_command('acquire_no_wait', _id)
         if res == OK:
+            self._items_registry.add(_id)
             return True
         elif res == BAD:
             return False
         else:
             raise KeyError(f"Unexpected response: {res!r}")
 
-    async def close(self):
+    def close(self):
         items = [_ for _ in self._items_registry]
         for _id in items:
-            await self.release(_id)
+            self.release(_id)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
